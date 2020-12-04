@@ -8,6 +8,8 @@ import json
 import os
 import pycuber as pc
 import math
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import csv
 
@@ -28,7 +30,7 @@ Pc = .9
 global alpha
 alpha = 1
 global share
-share = .02
+share = .01
 
 
 if __name__ == '__main__':
@@ -43,7 +45,7 @@ if __name__ == '__main__':
 	line1, = ax.plot([0,.18], [0,54], 'r.')
 	line2, = ax.plot([0,.18], [0,54], 'go')
 
-	if len(sys.argv) < 4:
+	if len(sys.argv) < 5:
 		print("Must include 'numGens popSize numberOfMoves numThreads'")
 		exit()
 	elif int(sys.argv[2])<2 or int(sys.argv[2])%2!=0:
@@ -83,8 +85,8 @@ def plot(pop):
 	#plt.title('Sin(x) and Cos(x) on the same graph') 
 	  
 	# Show a legend on the plot 
-	fig.canvas.draw()
-	fig.canvas.flush_events()
+	# fig.canvas.draw()
+	# fig.canvas.flush_events()
 
 def plotFinal(initial,final):
 	x2 = []
@@ -110,8 +112,8 @@ def plotFinal(initial,final):
 	#plt.title('Sin(x) and Cos(x) on the same graph') 
 	  
 	# Show a legend on the plot 
-	fig.canvas.draw()
-	fig.canvas.flush_events()
+	# fig.canvas.draw()
+	# fig.canvas.flush_events()
 
 #Displays the avg min, avg and max values for the found optima
 def plotAvg(avg):
@@ -192,22 +194,41 @@ def normalize(ranked):
 		i[0]/=total
 	return norm
 
-#Creates multiple processes to rank individuals based upon how close they come to solving the cube
-def fitPop(pop):
+#Used for multiprocessed stuff from fitPop
+def fitnessPop(pop,q):
 	ranked = []
 	for i in pop:
 		fitness = howClose(i)
+		q.put([fitness,i])
+
+#Creates multiple processes to rank individuals based upon how close they come to solving the cube
+def fitPop(pop):
+	ranked = []
+	que = Queue()
+	threads = []
+	chunkSize = int(int(sys.argv[2])/int(sys.argv[4]))
+	for i in range(int(sys.argv[4])):
+		if(i == int(sys.argv[4])-1):
+			threads.append(Process(target=fitnessPop,args=[pop[i*chunkSize:],que,]))
+		else:
+			threads.append(Process(target=fitnessPop,args=[pop[i*chunkSize:i*chunkSize+chunkSize],que,]))
+		threads[-1].start()
+	for i in threads:
+		i.join()
+
+	while not que.empty():
+		item = que.get()
 		if(len(ranked)==0):
-			ranked.append([fitness,i])
+			ranked.append(item)
 		else:
 			inserted = False
 			for y in range(0,len(ranked)):
-				if(fitness > ranked[y][0]):
-					ranked.insert(y,[fitness,i])
+				if(item[0] > ranked[y][0]):
+					ranked.insert(y,item)
 					inserted = True
 					break
 			if not inserted:
-				ranked.append([fitness,i])
+				ranked.append(item)
 	return ranked
 
 #Adds up all the fitness in a ranked population
@@ -274,18 +295,18 @@ def staticCrossover(p1,p2):
 	return child
 
 #Deterministic crowding method to keep the better/closer parent/child
-def deterministicCrowding(pool):
-	children = []
-	for i in range(0,len(pool)):
+def deterministicCrowding(pool,length,q):
+	
+	for i in range(0,length):
 		distanceThresh = .01
-		p1 = pool[random.randint(0,len(pool)-1)]
-		p2 = pool[random.randint(0,len(pool)-1)]
-		# j=0
-		while p2 == p1:# and abs(moves2dec(p1)-moves2dec(p2))>=distanceThresh:
-			p2 = pool[random.randint(0,len(pool)-1)]
-			# j+=1
-			# if(j%10 == 0):
-			# 	distanceThresh+=.001
+		x = random.randint(0,len(pool)-1)
+		y = random.randint(0,len(pool)-1)
+		while x == y:
+			y = random.randint(0,len(pool)-1)
+
+		p1 = pool[x]
+		p2 = pool[y]
+		
 
 		c1 = mutate(staticCrossover(p1,p2))
 		c2 = mutate(staticCrossover(p2,p1))
@@ -297,22 +318,40 @@ def deterministicCrowding(pool):
 
 		if abs(moves2dec(p1)-moves2dec(c1))+abs(moves2dec(p2)-moves2dec(c2))<=abs(moves2dec(p1)-moves2dec(c2))+abs(moves2dec(p2)-moves2dec(c1)):
 			if(c1Fit > p1Fit):
-				children.append(c1)
+				q.put(c1)
 			else:
-				children.append(p1)
+				q.put(p1)
 			if(c2Fit > p2Fit):
-				children.append(c2)
+				q.put(c2)
 			else:
-				children.append(p2)
+				q.put(p2)
 		else:
 			if(c2Fit > p1Fit):
-				children.append(c2)
+				q.put(c2)
 			else:
-				children.append(p1)
+				q.put(p1)
 			if(c1Fit > p2Fit):
-				children.append(c1)
+				q.put(c1)
 			else:
-				children.append(p2)
+				q.put(p2)
+
+def deterCrowdMulti(pool):
+	children = []
+	que = Queue()
+	threads = []
+	chunkSize = int(len(pool)/int(sys.argv[4]))
+	for i in range(int(sys.argv[4])):
+		if(i == int(sys.argv[4])-1):
+			threads.append(Process(target=deterministicCrowding,args=[pool,len(pool)-chunkSize*i,que,]))
+		else:
+			threads.append(Process(target=deterministicCrowding,args=[pool,chunkSize,que,]))
+		threads[-1].start()
+	for i in threads:
+		i.join()
+		i.close()
+
+	while not que.empty():
+		children.append(que.get())
 
 	return children
 
@@ -396,13 +435,13 @@ if __name__ == '__main__':
 		initial = list(population)
 		#Loop for numGen generations
 		for j in range(int(sys.argv[1])):
-			if(j%10==0):
-				print("Gen "+str(j))
+			#if(j%10==0):
+			print("Gen "+str(j))
 			#Run the fitness of the population
 			ranked = fitPop(population)
-
+			print("Fitness Done")
 			#Plot the population
-			plot(ranked)
+			#plot(ranked)
 
 			#Get the stats of the current generation
 			stat = rank(ranked)
@@ -414,23 +453,28 @@ if __name__ == '__main__':
 				avg[j][2]+=stat[0][0]
 			else:
 				avg.append([stat[1][0],stat[2],stat[0][0]])
+			print("Stats Done")
 
 			#time.sleep(.1)
 
 			#Get the individuals who'll be mating
 			pool = SUS(sharing(ranked))
+			print("Selection Done")
 			#Get the children from mating individuals
-			children = deterministicCrowding(pool)
+			children = deterCrowdMulti(pool)
+			print("Crowding Done")
 			#Mutate the group of children
 			population = staticMutate(children)
+			print("Mutate Done")
 		#Once out of the loop plot the final population
 		plotFinal(initial,population)
 		#Save a pic of it
 		plt.savefig("pictures/run "+str(i+1)+" GA.png")
 
-		print("Closest: ")
+		temp = fitPop(population)
+		print("Closest: "+str(temp[0][0]))
 		space = " "
-		string = space.join(fitPop(population)[0][1])
+		string = space.join(temp[0][1])
 		my_formula = pc.Formula(string)
 		randomCube(random_alg)
 		print(my_formula)
