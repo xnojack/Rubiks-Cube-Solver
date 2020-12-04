@@ -426,7 +426,7 @@ if __name__ == '__main__':
 		#Once out of the loop plot the final population
 		plotFinal(initial,population)
 		#Save a pic of it
-		plt.savefig("pictures/run "+str(i+1)+" GA.png")
+		plt.savefig("pictures/run "+str(i+1)+" GA "+sys.argv[3]+" moves.png")
 
 		print("Closest: ")
 		space = " "
@@ -437,7 +437,7 @@ if __name__ == '__main__':
 		print(randomCube)
 		#time.sleep(1)
 	#Save the stats to their csv files
-	myFile = open('data/GA raw.csv', 'w')
+	myFile = open('data/GA raw '+sys.argv[3]+' moves.csv', 'w')
 	with myFile:
 	    writer = csv.writer(myFile)
 	    writer.writerows(stats)
@@ -450,7 +450,7 @@ if __name__ == '__main__':
 	data = [['gen','min','avg','max']]
 	for i in range(len(avg)):
 		data.append([i,avg[i][0],avg[i][1],avg[i][2]])
-	myFile = open('data/GA avg.csv', 'w')
+	myFile = open('data/GA avg '+sys.argv[3]+' moves.csv', 'w')
 	with myFile:
 	    writer = csv.writer(myFile)
 	    writer.writerows(data)
@@ -459,5 +459,5 @@ if __name__ == '__main__':
 	#reset the plot and plot the avg for all 10 runs
 	plotReset()
 	plotAvg(avg)
-	plt.savefig("pictures/GA Avg.png")
+	plt.savefig("pictures/GA Avg "+sys.argv[3]+" moves.png")
 	time.sleep(10)
