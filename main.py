@@ -16,6 +16,11 @@ global moves
 global solved
 global random_alg
 
+faces = ['U','L','F','R','B','D']
+moves = ["U","L","F","R","B","D","U'","L'","F'","R'","B'","D'","U2","L2","F2","R2","B2","D2"]
+
+solved = pc.Cube()
+
 global Pm
 Pm = .50
 global Pc
@@ -25,34 +30,31 @@ alpha = 1
 global share
 share = .02
 
-#Code for the plotting function in python
-plt.ion()
-global fig
-fig = plt.figure()
-ax = fig.add_subplot(111)
-global line1
-global line2
-global line3
-line1, = ax.plot([0,.18], [0,54], 'r.')
-line2, = ax.plot([0,.18], [0,54], 'go')
 
-if len(sys.argv) < 5:
-	print("Must include 'numGens popSize numberOfMoves numThreads'")
-	exit()
-elif int(sys.argv[2])<2 or int(sys.argv[2])%2!=0:
-	print("Pop size must be 2 or greater and even")
-	exit()
-elif int(sys.argv[3])<1:
-	print("numAllowedMoves must be 1 or more")
-	exit()
+if __name__ == '__main__':
+	#Code for the plotting function in python
+	plt.ion()
+	global fig
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	global line1
+	global line2
+	global line3
+	line1, = ax.plot([0,.18], [0,54], 'r.')
+	line2, = ax.plot([0,.18], [0,54], 'go')
 
-faces = ['U','L','F','R','B','D']
-moves = ["U","L","F","R","B","D","U'","L'","F'","R'","B'","D'","U2","L2","F2","R2","B2","D2"]
+	if len(sys.argv) < 5:
+		print("Must include 'numGens popSize numberOfMoves numThreads'")
+		exit()
+	elif int(sys.argv[2])<2 or int(sys.argv[2])%2!=0:
+		print("Pop size must be 2 or greater and even")
+		exit()
+	elif int(sys.argv[3])<1:
+		print("numAllowedMoves must be 1 or more")
+		exit()
 
-solved = pc.Cube()
-
-alg = pc.Formula()
-random_alg = alg.random()
+	alg = pc.Formula()
+	random_alg = alg.random()
 
 #Converts moves to a decimal fraction, used for plotting and sharing
 def moves2dec(movesCube):
@@ -190,37 +192,28 @@ def normalize(ranked):
 		i[0]/=total
 	return norm
 
+#Used for multiprocessed stuff from fitPop
 def fitnessPop(pop,q):
 	ranked = []
 	for i in pop:
 		fitness = howClose(i)
 		q.put([fitness,i])
-	quit()
-	# 	if(len(ranked)==0):
-	# 		ranked.append([fitness,i])
-	# 	else:
-	# 		inserted = False
-	# 		for y in range(0,len(ranked)):
-	# 			if(fitness > ranked[y][0]):
-	# 				ranked.insert(y,[fitness,i])
-	# 				inserted = True
-	# 				break
-	# 		if not inserted:
-	# 			ranked.append([fitness,i])
-	# return ranked
 
-#Ranks indivudals in the population according to how close they solve a cube
+#Creates multiple processes to rank individuals based upon how close they come to solving the cube
 def fitPop(pop):
 	ranked = []
 	que = Queue()
 	threads = []
 	chunkSize = int(int(sys.argv[2])/int(sys.argv[4]))
 	for i in range(int(sys.argv[4])):
-		threads.append(Process(target=fitnessPop,args=[pop[i*chunkSize:i*chunkSize+chunkSize],que,]))
+		if(i == int(sys.argv[4])-1):
+			threads.append(Process(target=fitnessPop,args=[pop[i*chunkSize:],que,]))
+		else:
+			threads.append(Process(target=fitnessPop,args=[pop[i*chunkSize:i*chunkSize+chunkSize],que,]))
 		threads[-1].start()
 	for i in threads:
 		i.join()
-	print("Should be done")
+
 	while not que.empty():
 		item = que.get()
 		if(len(ranked)==0):
@@ -300,10 +293,9 @@ def staticCrossover(p1,p2):
 	return child
 
 #Deterministic crowding method to keep the better/closer parent/child
-def deterministicCrowding(pool):
-	children = []
+def deterministicCrowding(pool,length,q):
 	
-	for i in range(0,len(pool)):
+	for i in range(0,length):
 		distanceThresh = .01
 		p1 = pool[random.randint(0,len(pool)-1)]
 		p2 = pool[random.randint(0,len(pool)-1)]
@@ -324,26 +316,56 @@ def deterministicCrowding(pool):
 
 		if abs(moves2dec(p1)-moves2dec(c1))+abs(moves2dec(p2)-moves2dec(c2))<=abs(moves2dec(p1)-moves2dec(c2))+abs(moves2dec(p2)-moves2dec(c1)):
 			if(c1Fit > p1Fit):
-				children.append(c1)
+				q.put(c1)
 			else:
-				children.append(p1)
+				q.put(p1)
 			if(c2Fit > p2Fit):
-				children.append(c2)
+				q.put(c2)
 			else:
-				children.append(p2)
+				q.put(p2)
 		else:
 			if(c2Fit > p1Fit):
-				children.append(c2)
+				q.put(c2)
 			else:
-				children.append(p1)
+				q.put(p1)
 			if(c1Fit > p2Fit):
-				children.append(c1)
+				q.put(c1)
 			else:
-				children.append(p2)
+				q.put(p2)
 
 
 	# print(len(children))
 	return children
+
+def deterCrowdMulti(pool):
+	que = Queue()
+	threads = []
+	chunkSize = int(len(pool)/int(sys.argv[4]))
+	print(chunkSize)
+	quit()
+	for i in range(int(sys.argv[4])):
+		if(i == int(sys.argv[4])-1):
+			threads.append(Process(target=fitnessPop,args=[pool,chunkSize,que,]))
+		else:
+			threads.append(Process(target=fitnessPop,args=[pool,chunkSize,que,]))
+		threads[-1].start()
+	for i in threads:
+		i.join()
+
+	while not que.empty():
+		item = que.get()
+		if(len(ranked)==0):
+			ranked.append(item)
+		else:
+			inserted = False
+			for y in range(0,len(ranked)):
+				if(item[0] > ranked[y][0]):
+					ranked.insert(y,item)
+					inserted = True
+					break
+			if not inserted:
+				ranked.append(item)
+	return ranked
 
 #Randomly selects 2 parents from the pool to mate
 def randomMating(pool):
@@ -402,89 +424,91 @@ def staticSelection(ranked):
 
 	return pool
 
-#Store data for csvs
-stats = [['run number','gen number','min','avg','max']]
-avg = []
-print("Random Alg: ")
-print(random_alg)
-randomCube = pc.Cube()
-randomCube(random_alg)
-print(randomCube)
-#Make 10 runs
-for i in range(10):
-	#Clear line2 (Final pop) from plot
-	line2.set_ydata([])
-	line2.set_xdata([])
-
-	print("Run ",i+1)
-
-	#Make the initial population
-	population = createPopulation(int(sys.argv[2]))
-	#Store the initial population
-	initial = list(population)
-	#Loop for numGen generations
-	for j in range(int(sys.argv[1])):
-		if(j%10==0):
-			print("Gen "+str(j))
-		#Run the fitness of the population
-		ranked = fitPop(population)
-		#Plot the population
-		plot(ranked)
-
-		#Get the stats of the current generation
-		stat = rank(ranked)
-		stats.append([i,j,stat[1][0],stat[2],stat[0][0]])
-		#For storing the avg results
-		if j < len(avg):
-			avg[j][0]+=stat[1][0]
-			avg[j][1]+=stat[2]
-			avg[j][2]+=stat[0][0]
-		else:
-			avg.append([stat[1][0],stat[2],stat[0][0]])
-
-		#time.sleep(.1)
-
-		#Get the individuals who'll be mating
-		pool = SUS(sharing(ranked))
-		#Get the children from mating individuals
-		children = deterministicCrowding(pool)
-		#Mutate the group of children
-		population = staticMutate(children)
-	#Once out of the loop plot the final population
-	plotFinal(initial,population)
-	#Save a pic of it
-	plt.savefig("pictures/run "+str(i+1)+" GA.png")
-
-	print("Closest: ")
-	space = " "
-	string = space.join(fitPop(population)[0][1])
-	my_formula = pc.Formula(string)
+if __name__ == '__main__':
+	#Store data for csvs
+	stats = [['run number','gen number','min','avg','max']]
+	avg = []
+	print("Random Alg: ")
+	print(random_alg)
+	randomCube = pc.Cube()
 	randomCube(random_alg)
-	print(my_formula)
 	print(randomCube)
-	#time.sleep(1)
-#Save the stats to their csv files
-myFile = open('data/GA raw.csv', 'w')
-with myFile:
-    writer = csv.writer(myFile)
-    writer.writerows(stats)
-myFile.close()
-for i in range(len(avg)):
-	avg[i][0]/=10
-	avg[i][1]/=10
-	avg[i][2]/=10
+	#Make 10 runs
+	for i in range(10):
+		#Clear line2 (Final pop) from plot
+		line2.set_ydata([])
+		line2.set_xdata([])
 
-data = [['gen','min','avg','max']]
-for i in range(len(avg)):
-	data.append([i,avg[i][0],avg[i][1],avg[i][2]])
-myFile = open('data/GA avg.csv', 'w')
-with myFile:
-    writer = csv.writer(myFile)
-    writer.writerows(data)
-myFile.close()
+		print("Run ",i+1)
 
-#reset the plot and plot the avg for all 10 runs
-plotReset()
-plotAvg(avg)
-plt.savefig("pictures/GA Avg.png")
-time.sleep(10)
+		#Make the initial population
+		population = createPopulation(int(sys.argv[2]))
+		#Store the initial population
+		initial = list(population)
+		#Loop for numGen generations
+		for j in range(int(sys.argv[1])):
+			if(j%10==0):
+				print("Gen "+str(j))
+			#Run the fitness of the population
+			ranked = fitPop(population)
+			print(len(ranked))
+			#Plot the population
+			plot(ranked)
+
+			#Get the stats of the current generation
+			stat = rank(ranked)
+			stats.append([i,j,stat[1][0],stat[2],stat[0][0]])
+			#For storing the avg results
+			if j < len(avg):
+				avg[j][0]+=stat[1][0]
+				avg[j][1]+=stat[2]
+				avg[j][2]+=stat[0][0]
+			else:
+				avg.append([stat[1][0],stat[2],stat[0][0]])
+
+			#time.sleep(.1)
+
+			#Get the individuals who'll be mating
+			pool = SUS(sharing(ranked))
+			#Get the children from mating individuals
+			children = deterministicCrowding(pool)
+			#Mutate the group of children
+			population = staticMutate(children)
+		#Once out of the loop plot the final population
+		plotFinal(initial,population)
+		#Save a pic of it
+		plt.savefig("pictures/run "+str(i+1)+" GA.png")
+
+		print("Closest: ")
+		space = " "
+		string = space.join(fitPop(population)[0][1])
+		my_formula = pc.Formula(string)
+		randomCube(random_alg)
+		print(my_formula)
+		print(randomCube)
+		#time.sleep(1)
+	#Save the stats to their csv files
+	myFile = open('data/GA raw.csv', 'w')
+	with myFile:
+	    writer = csv.writer(myFile)
+	    writer.writerows(stats)
+	myFile.close()
+	for i in range(len(avg)):
+		avg[i][0]/=10
+		avg[i][1]/=10
+		avg[i][2]/=10
+
+	data = [['gen','min','avg','max']]
+	for i in range(len(avg)):
+		data.append([i,avg[i][0],avg[i][1],avg[i][2]])
+	myFile = open('data/GA avg.csv', 'w')
+	with myFile:
+	    writer = csv.writer(myFile)
+	    writer.writerows(data)
+	myFile.close()
+
+	#reset the plot and plot the avg for all 10 runs
+	plotReset()
+	plotAvg(avg)
+	plt.savefig("pictures/GA Avg.png")
+	time.sleep(10)
