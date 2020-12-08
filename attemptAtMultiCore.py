@@ -30,7 +30,7 @@ Pc = .9
 global alpha
 alpha = 1
 global share
-share = .01
+share = .0025
 
 
 if __name__ == '__main__':
@@ -44,6 +44,14 @@ if __name__ == '__main__':
 	global line3
 	line1, = ax.plot([0,.18], [0,54], 'r.')
 	line2, = ax.plot([0,.18], [0,54], 'go')
+	line3, = ax.plot([0,.18], [0,54], 'b-')
+	
+	global currentMax
+	currentMax = 20
+	global stage
+	stage = 0
+	global newPop
+	newPop = 0
 
 	if len(sys.argv) < 5:
 		print("Must include 'numGens popSize numberOfMoves numThreads'")
@@ -55,6 +63,7 @@ if __name__ == '__main__':
 		print("numAllowedMoves must be 1 or more")
 		exit()
 
+	#random_alg = pc.Formula("U2 F' R B L2 D' R' B2 D F R D B2 U R' D L2 U' F2 D2 R2 B2 L' U' F")
 	alg = pc.Formula()
 	random_alg = alg.random()
 
@@ -117,9 +126,9 @@ def plotFinal(initial,final):
 
 #Displays the avg min, avg and max values for the found optima
 def plotAvg(avg):
-	line1, = ax.plot([0,100], [0,54], 'g-')
-	line2, = ax.plot([0,100], [0,54], 'r-')
-	line3, = ax.plot([0,100], [0,54], 'b-')
+	line1, = ax.plot([0,int(sys.argv[1])], [0,54], 'g-')
+	line2, = ax.plot([0,int(sys.argv[1])], [0,54], 'r-')
+	line3, = ax.plot([0,int(sys.argv[1])], [0,54], 'b-')
 
 	x = np.arange(0,100,1)
 	y1 = []
@@ -169,20 +178,155 @@ def howClose(moves):
 					count = count + 1
 	return count
 
+#Instead of doing all moves at once like above, we work slowly to the end result
+def cubeSolve(moves):
+	count = 0
+	fit = 0
+	space = " "
+	cube = pc.Cube()
+	cube(random_alg)
+	tempMoves = list(moves)
+	movesNeeded = 100
+	global stage
+	
+	#First solve the bottom white cross
+	if count == 0:
+		face = 'D'
+		surroundFace = ['F','R','B','L']
+		solvedFace = solved.get_face(face)
+		for i in range(len(moves)):
+			move = tempMoves.pop(0)
+			count = 0
+			my_formula = pc.Formula(move)
+			cube(my_formula)
+			cubeFace = cube.get_face(face)
+			if(cubeFace[0][1] == solvedFace[0][1]):
+				count+=1
+			for y in range(0,3):
+				if(cubeFace[1][y] == solvedFace[1][y]):
+					count+=1
+			if(cubeFace[2][1] == solvedFace[2][1]):
+				count+=1
+
+			for sFace in surroundFace:
+				solvFace = solved.get_face(sFace)
+				cFace = cube.get_face(sFace)
+				for y in range(1,3):
+					if(cFace[y][1] == solvFace[y][1]):
+						count+=1
+
+			if count >= 13:
+				if(newPop == 0):
+					print("Cross "+str(count))
+					print(cube)
+					print(int(sys.argv[3])-len(tempMoves))
+				fit+=count+len(tempMoves)
+				stage = 1
+				movesNeeded = int(sys.argv[3])-len(tempMoves)
+				break
+			elif count >= 12 and int(sys.argv[3])-len(tempMoves)<currentMax and stage == 0:
+				#if(len(tempMoves)>=70):
+				print("Cross "+str(count))
+				print(cube)
+				print(int(sys.argv[3])-len(tempMoves))
+		fit+=count
+
+	#Then solve the white face
+	if count >= 13:
+		face = 'D'
+		surroundFace = ['F','R','B','L']
+		solvedFace = solved.get_face(face)
+		rMoves = len(tempMoves)
+		for i in range(rMoves):
+			count = 0
+			move = tempMoves.pop(0)
+			my_formula = pc.Formula(move)
+			cube(my_formula)
+			cubeFace = cube.get_face(face)
+			for j in range(0,3):
+				for y in range(0,3):
+					if(cubeFace[j][y] == solvedFace[j][y]):
+						count+=1
+
+			if count >= 9:
+				print("Bottom "+str(count))
+				print(cube)
+				print(int(sys.argv[3])-len(tempMoves))
+
+			for sFace in surroundFace:
+				solvFace = solved.get_face(sFace)
+				cFace = cube.get_face(sFace)
+				for y in range(3):
+					if(cFace[2][y] == solvFace[2][y]):
+						count+=1
+				if(cFace[1][1] == solvFace[1][1]):
+					count+=1
+
+			if count >= 25:
+				print("Bottom "+str(count))
+				print(cube)
+				print(int(sys.argv[3])-len(tempMoves))
+				fit+=count+len(tempMoves)
+				movesNeeded = int(sys.argv[3])-len(tempMoves)
+				stage = 2
+				break
+
+		fit+=count
+
+	#If bottom face is solved solve the lower parts of the surrounding faces
+	if count >= 25:
+		faceLoop = ['D','F','R','B','L']
+		
+		rMoves = len(tempMoves)
+		
+		for i in range(rMoves):
+			count = 0
+			move = tempMoves.pop(0)
+			my_formula = pc.Formula(move)
+			cube(my_formula)
+			for face in faces:
+				solvedFace = solved.get_face(face)
+				cubeFace = cube.get_face(face)
+				for j in range(1,3):
+					for y in range(0,3):
+						if(cubeFace[j][y] == solvedFace[j][y]):
+							count+=1
+			if count >= 33:
+				print("Next 2 layers "+str(count))
+				fit+=count+len(tempMoves)
+				stage = 3
+				movesNeeded = int(sys.argv[3])-len(tempMoves)
+				break
+		fit+=count
+	if(fit==0):
+		fit = howClose(moves)%3
+	return [fit,movesNeeded,stage]
+
 #Generates a set of random moves of length N
-def randomMoves():
-	length = int(sys.argv[3])
+def randomMoves(length):
 	sample = []
 	while len(sample) < length:
 		sample.append(random.choice(moves))
 	return sample
 
 #Create population of size N
-def createPopulation(size):
+def createPopulation(size,num):
 	population = []
 	for i in range(0,size):
-		population.append(randomMoves())
+		population.append(randomMoves(num))
 	return population
+
+#make a new pop based off a defined beginning
+def newPop(beginning):
+	pop = []
+	for i in range(int(sys.argv[2])):
+		temp = []
+		for gene in beginning:
+			temp.append(gene)
+		while len(temp) < int(sys.argv[3]):
+			temp.append(random.choice(moves))
+		pop.append(temp)
+	return pop
 
 #Normalizes the fitness so that they add up to equal 1
 def normalize(ranked):
@@ -198,8 +342,8 @@ def normalize(ranked):
 def fitnessPop(pop,q):
 	ranked = []
 	for i in pop:
-		fitness = howClose(i)
-		q.put([fitness,i])
+		result = cubeSolve(i)
+		q.put([result[0],i,result[1],result[2]])
 
 #Creates multiple processes to rank individuals based upon how close they come to solving the cube
 def fitPop(pop):
@@ -213,10 +357,12 @@ def fitPop(pop):
 		else:
 			threads.append(Process(target=fitnessPop,args=[pop[i*chunkSize:i*chunkSize+chunkSize],que,]))
 		threads[-1].start()
-	for i in threads:
-		i.join()
+	# for i in threads:
+	# 	print("Waiting on thread "+str(i))
+	# 	i.join()
+	# 	print("Complete thread "+str(i))
 
-	while not que.empty():
+	while not que.empty() or len(ranked)<int(sys.argv[2]):
 		item = que.get()
 		if(len(ranked)==0):
 			ranked.append(item)
@@ -229,6 +375,12 @@ def fitPop(pop):
 					break
 			if not inserted:
 				ranked.append(item)
+
+	if(ranked[0][3] == 1 and ranked[0][2] <= 40):
+		global currentMax
+		currentMax = ranked[0][2]
+		global stage
+		stage = 1
 	return ranked
 
 #Adds up all the fitness in a ranked population
@@ -278,20 +430,23 @@ def SUS(ranked):
 
 #Mutates and individual child according to the mutation rate
 def mutate(child):
-	if(random.random() < Pm):
-		rand = random.randint(0,int(sys.argv[3])-1)
-		child[rand] = random.choice(moves)
+	for i in range(int(currentMax/10)):
+		if(random.random() < Pm):
+			rand = random.randint(0,currentMax-1)
+			child[rand] = random.choice(moves)
 	return child
 
 #Takes first 3 elements from p1, second 3 from p2 and last 4 from p1 to generate a child
 def staticCrossover(p1,p2):
 	child = []
-	for i in range(0,int(int(sys.argv[3])/3)):
+	for i in range(0,int(currentMax/3)):
 		child.append(p1[i])
-	for i in range(int(int(sys.argv[3])/3),int(int(sys.argv[3])/3)*2):
+	for i in range(int(currentMax/3),int(currentMax/3)*2):
 		child.append(p2[i])
-	for i in range(int(int(sys.argv[3])/3)*2,int(sys.argv[3])):
+	for i in range(int(currentMax/3)*2,currentMax):
 		child.append(p1[i])
+	for i in range(currentMax,int(sys.argv[3])):
+		child.append(random.choice(moves))
 	return child
 
 #Deterministic crowding method to keep the better/closer parent/child
@@ -299,7 +454,8 @@ def deterministicCrowding(pool,length,q):
 	
 	for i in range(0,length):
 		distanceThresh = .01
-		x = random.randint(0,len(pool)-1)
+		x = i
+		#x = random.randint(0,len(pool)-1)
 		y = random.randint(0,len(pool)-1)
 		while x == y:
 			y = random.randint(0,len(pool)-1)
@@ -311,10 +467,10 @@ def deterministicCrowding(pool,length,q):
 		c1 = mutate(staticCrossover(p1,p2))
 		c2 = mutate(staticCrossover(p2,p1))
 
-		p1Fit=howClose(p1)
-		p2Fit=howClose(p2)
-		c1Fit=howClose(c1)
-		c2Fit=howClose(c2)
+		p1Fit=cubeSolve(p1)
+		p2Fit=cubeSolve(p2)
+		c1Fit=cubeSolve(c1)
+		c2Fit=cubeSolve(c2)
 
 		if abs(moves2dec(p1)-moves2dec(c1))+abs(moves2dec(p2)-moves2dec(c2))<=abs(moves2dec(p1)-moves2dec(c2))+abs(moves2dec(p2)-moves2dec(c1)):
 			if(c1Fit > p1Fit):
@@ -346,11 +502,11 @@ def deterCrowdMulti(pool):
 		else:
 			threads.append(Process(target=deterministicCrowding,args=[pool,chunkSize,que,]))
 		threads[-1].start()
-	for i in threads:
-		i.join()
-		i.close()
+	# for i in threads:
+	# 	i.join()
+	# 	i.close()
 
-	while not que.empty():
+	while not que.empty() or len(children)<int(sys.argv[2]):
 		children.append(que.get())
 
 	return children
@@ -413,6 +569,8 @@ def staticSelection(ranked):
 	return pool
 
 if __name__ == '__main__':
+	line3.set_ydata([])
+	line3.set_xdata([])
 	#Store data for csvs
 	stats = [['run number','gen number','min','avg','max']]
 	avg = []
@@ -430,16 +588,17 @@ if __name__ == '__main__':
 		print("Run ",i+1)
 
 		#Make the initial population
-		population = createPopulation(int(sys.argv[2]))
+		population = createPopulation(int(sys.argv[2]),int(sys.argv[3]))
 		#Store the initial population
 		initial = list(population)
 		#Loop for numGen generations
+		closest = []
 		for j in range(int(sys.argv[1])):
-			#if(j%10==0):
-			print("Gen "+str(j))
+			if(j%10==0):
+				print("Gen "+str(j))
+				print(currentMax)
 			#Run the fitness of the population
 			ranked = fitPop(population)
-			print("Fitness Done")
 			#Plot the population
 			#plot(ranked)
 
@@ -453,30 +612,46 @@ if __name__ == '__main__':
 				avg[j][2]+=stat[0][0]
 			else:
 				avg.append([stat[1][0],stat[2],stat[0][0]])
-			print("Stats Done")
 
 			#time.sleep(.1)
 
-			#Get the individuals who'll be mating
-			pool = SUS(sharing(ranked))
-			print("Selection Done")
-			#Get the children from mating individuals
-			children = deterCrowdMulti(pool)
-			print("Crowding Done")
-			#Mutate the group of children
-			population = staticMutate(children)
-			print("Mutate Done")
+			#See if we have a good solution for making the white cross, if we do remake the population using that
+			if stage == 1 and ranked[0][0] > 13 and ranked[0][2] <= 15 and newPop == 0:
+				population = newPop(ranked[0][1][:ranked[0][2]])
+				newPop = 1
+				print("Made new pop")
+			else:
+				#Get the individuals who'll be mating
+				#pool = SUS(sharing(ranked))
+				print(ranked[0][0],ranked[0][2],ranked[0][3])
+				pool = SUS(ranked)
+				#Get the children from mating individuals
+				population = deterCrowdMulti(pool)
+				#Mutate the group of children
+				#population = staticMutate(children)
+			if closest == []:
+				closest = ranked[0]
+			elif closest[0] < ranked[0][0]:
+				closest = ranked[0]
+
 		#Once out of the loop plot the final population
 		plotFinal(initial,population)
 		#Save a pic of it
 		plt.savefig("pictures/run "+str(i+1)+" GA.png")
 
 		temp = fitPop(population)
-		print("Closest: "+str(temp[0][0]))
+		if closest[0] < temp[0][0]:
+			closest = temp[0]
+		print("Stage: "+str(stage))
+		stage = 0
+		print("Closest: "+str(howClose(closest[1][:closest[2]])))
+		currentMax = 10
 		space = " "
-		string = space.join(temp[0][1])
+		string = space.join(closest[1][:closest[2]])
 		my_formula = pc.Formula(string)
+		randomCube = pc.Cube()
 		randomCube(random_alg)
+		randomCube(my_formula)
 		print(my_formula)
 		print(randomCube)
 		#time.sleep(1)

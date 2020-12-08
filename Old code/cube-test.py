@@ -14,8 +14,10 @@ moves = ["U","L","F","R","B","D","U'","L'","F'","R'","B'","D'","U2","L2","F2","R
 solved = pc.Cube()
 randomCube = pc.Cube()
 
-alg = pc.Formula()
+alg = pc.Formula('U')
 random_alg = alg.random()
+print(random_alg)
+quit()
 
 def randomMoves():
 	length = int(random.random()*100)
