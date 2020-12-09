@@ -45,7 +45,7 @@ if __name__ == '__main__':
 	line3, = ax.plot([0,.18], [0,54], 'b.')
 
 	if len(sys.argv) < 4:
-		print("Must include 'numGens popSize numberOfMoves numThreads'")
+		print("Must include 'numGens popSize numberOfMoves'")
 		exit()
 	elif int(sys.argv[2])<2 or int(sys.argv[2])%2!=0:
 		print("Pop size must be 2 or greater and even")
