@@ -14,3 +14,6 @@ To use GAs to solve a cube step by step, like [here](https://rubiks-cube-solver.
 
 ### For greedy
 
+[rubik-cube](https://github.com/pglass/cube) project will need to be installed in order to properly use the `greedy.py` project this can visited at the link or installed using pip via this command: pip install rubik-cube
+
+To use the `greedy.py` file all you need to do is simply travel to the directory it is located in via a CLI and execute the following command: `py greedy.py` and it will start execution and solving cubes for as long as you desire. In order to stop the execution simply use CTRL+C in the command prompt or terminal and it will terminate.
